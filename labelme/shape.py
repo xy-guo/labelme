@@ -194,7 +194,7 @@ class Shape(object):
         if i == self._highlightIndex:
             size, shape = self._highlightSettings[self._highlightMode]
             d *= size
-        if self._highlightIndex is not None:
+        if self._highlightIndex is not None: #  or self.selected:
             self._vertex_fill_color = self.hvertex_fill_color
         else:
             self._vertex_fill_color = self.vertex_fill_color
@@ -219,6 +219,8 @@ class Shape(object):
         min_distance = float("inf")
         post_i = None
         for i in range(len(self.points)):
+            if i == 0:
+                continue
             line = [self.points[i - 1], self.points[i]]
             dist = labelme.utils.distancetoline(point, line)
             if dist <= epsilon and dist < min_distance:

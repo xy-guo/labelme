@@ -29,6 +29,7 @@ class Canvas(QtWidgets.QWidget):
     shapeMoved = QtCore.Signal()
     drawingPolygon = QtCore.Signal(bool)
     vertexSelected = QtCore.Signal(bool)
+    changeMode = QtCore.Signal()
 
     CREATE, EDIT = 0, 1
     CREATE, EDIT = 0, 1
@@ -241,30 +242,30 @@ class Canvas(QtWidgets.QWidget):
             self.current.highlightClear()
             return
 
-        # Polygon copy moving.
-        if QtCore.Qt.RightButton & ev.buttons():
-            if self.selectedShapesCopy and self.prevPoint:
-                self.overrideCursor(CURSOR_MOVE)
-                self.boundedMoveShapes(self.selectedShapesCopy, pos)
-                self.repaint()
-            elif self.selectedShapes:
-                self.selectedShapesCopy = [
-                    s.copy() for s in self.selectedShapes
-                ]
-                self.repaint()
-            return
+        # # Polygon copy moving.
+        # if QtCore.Qt.RightButton & ev.buttons():
+        #     if self.selectedShapesCopy and self.prevPoint:
+        #         self.overrideCursor(CURSOR_MOVE)
+        #         self.boundedMoveShapes(self.selectedShapesCopy, pos)
+        #         self.repaint()
+        #     elif self.selectedShapes:
+        #         self.selectedShapesCopy = [
+        #             s.copy() for s in self.selectedShapes
+        #         ]
+        #         self.repaint()
+        #     return
 
-        # Polygon/Vertex moving.
+        # # Polygon/Vertex moving.
         if QtCore.Qt.LeftButton & ev.buttons():
             if self.selectedVertex():
                 self.boundedMoveVertex(pos)
                 self.repaint()
                 self.movingShape = True
-            elif self.selectedShapes and self.prevPoint:
-                self.overrideCursor(CURSOR_MOVE)
-                self.boundedMoveShapes(self.selectedShapes, pos)
-                self.repaint()
-                self.movingShape = True
+            # elif self.selectedShapes and self.prevPoint:
+            #     self.overrideCursor(CURSOR_MOVE)
+            #     self.boundedMoveShapes(self.selectedShapes, pos)
+            #     self.repaint()
+            #     self.movingShape = True
             return
 
         # Just hovering over the canvas, 2 possibilities:
@@ -302,21 +303,21 @@ class Canvas(QtWidgets.QWidget):
                 self.setStatusTip(self.toolTip())
                 self.update()
                 break
-            elif shape.containsPoint(pos):
-                if self.selectedVertex():
-                    self.hShape.highlightClear()
-                self.prevhVertex = self.hVertex
-                self.hVertex = None
-                self.prevhShape = self.hShape = shape
-                self.prevhEdge = self.hEdge
-                self.hEdge = None
-                self.setToolTip(
-                    self.tr("Click & drag to move shape '%s'") % shape.label
-                )
-                self.setStatusTip(self.toolTip())
-                self.overrideCursor(CURSOR_GRAB)
-                self.update()
-                break
+            # elif shape.containsPoint(pos):
+            #     if self.selectedVertex():
+            #         self.hShape.highlightClear()
+            #     self.prevhVertex = self.hVertex
+            #     self.hVertex = None
+            #     self.prevhShape = self.hShape = shape
+            #     self.prevhEdge = self.hEdge
+            #     self.hEdge = None
+            #     self.setToolTip(
+            #         self.tr("Click & drag to move shape '%s'") % shape.label
+            #     )
+            #     self.setStatusTip(self.toolTip())
+            #     self.overrideCursor(CURSOR_GRAB)
+            #     self.update()
+            #     break
         else:  # Nothing found, clear highlights, reset state.
             self.unHighlight()
         self.vertexSelected.emit(self.hVertex is not None)
@@ -350,7 +351,10 @@ class Canvas(QtWidgets.QWidget):
             pos = self.transformPos(ev.localPos())
         else:
             pos = self.transformPos(ev.posF())
-        if ev.button() == QtCore.Qt.LeftButton:
+        
+        if ev.button() == QtCore.Qt.MiddleButton:
+            self.changeMode.emit()
+        elif ev.button() == QtCore.Qt.LeftButton:
             if self.drawing():
                 if self.current:
                     # Add point to existing shape.
@@ -382,18 +386,23 @@ class Canvas(QtWidgets.QWidget):
                         self.drawingPolygon.emit(True)
                         self.update()
             elif self.editing():
-                if self.selectedEdge():
-                    self.addPointToEdge()
-                elif (
-                    self.selectedVertex()
-                    and int(ev.modifiers()) == QtCore.Qt.ShiftModifier
-                ):
-                    # Delete point if: left-click + SHIFT on a point
-                    self.removeSelectedPoint()
+                if self.hShape not in self.selectedShapes and self.selectedEdge():
+                    self.selectionChanged.emit([self.hShape])
+                else:
+                    if self.selectedEdge():
+                        if not self.hShape.selected:
+                            self.hShapeIsSelected
+                        self.addPointToEdge()
+                    elif (
+                        self.selectedVertex()
+                        and int(ev.modifiers()) == QtCore.Qt.ShiftModifier
+                    ):
+                        # Delete point if: left-click + SHIFT on a point
+                        self.removeSelectedPoint()
 
-                group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
-                self.selectShapePoint(pos, multiple_selection_mode=group_mode)
-                self.prevPoint = pos
+                    group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
+                    self.selectShapePoint(pos, multiple_selection_mode=group_mode)
+                    self.prevPoint = pos
                 self.repaint()
         elif ev.button() == QtCore.Qt.RightButton and self.editing():
             group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
@@ -466,7 +475,7 @@ class Canvas(QtWidgets.QWidget):
         self._hideBackround = self.hideBackround if enable else False
 
     def canCloseShape(self):
-        return self.drawing() and self.current and len(self.current) > 2
+        return self.drawing() and self.current and len(self.current) >= 2
 
     def mouseDoubleClickEvent(self, ev):
         # We need at least 4 points here, since the mousePress handler
@@ -474,9 +483,9 @@ class Canvas(QtWidgets.QWidget):
         if (
             self.double_click == "close"
             and self.canCloseShape()
-            and len(self.current) > 3
+            and len(self.current) >= 2
         ):
-            self.current.popPoint()
+            # self.current.popPoint()
             self.finalise()
 
     def selectShapes(self, shapes):
@@ -489,22 +498,22 @@ class Canvas(QtWidgets.QWidget):
         if self.selectedVertex():  # A vertex is marked for selection.
             index, shape = self.hVertex, self.hShape
             shape.highlightVertex(index, shape.MOVE_VERTEX)
-        else:
-            for shape in reversed(self.shapes):
-                if self.isVisible(shape) and shape.containsPoint(point):
-                    self.setHiding()
-                    if shape not in self.selectedShapes:
-                        if multiple_selection_mode:
-                            self.selectionChanged.emit(
-                                self.selectedShapes + [shape]
-                            )
-                        else:
-                            self.selectionChanged.emit([shape])
-                        self.hShapeIsSelected = False
-                    else:
-                        self.hShapeIsSelected = True
-                    self.calculateOffsets(point)
-                    return
+        # else:
+        #     for shape in reversed(self.shapes):
+        #         if self.isVisible(shape) and shape.containsPoint(point):
+        #             self.setHiding()
+        #             if shape not in self.selectedShapes:
+        #                 if multiple_selection_mode:
+        #                     self.selectionChanged.emit(
+        #                         self.selectedShapes + [shape]
+        #                     )
+        #                 else:
+        #                     self.selectionChanged.emit([shape])
+        #                 self.hShapeIsSelected = False
+        #             else:
+        #                 self.hShapeIsSelected = True
+        #             self.calculateOffsets(point)
+        #             return
         self.deSelectShape()
 
     def calculateOffsets(self, point):
@@ -619,11 +628,13 @@ class Canvas(QtWidgets.QWidget):
 
         p.drawPixmap(0, 0, self.pixmap)
         Shape.scale = self.scale
+        
         for shape in self.shapes:
             if (shape.selected or not self._hideBackround) and self.isVisible(
                 shape
             ):
-                shape.fill = shape.selected or shape == self.hShape
+                # print("shape fill", shape)
+                # shape.fill = shape.selected or shape == self.hShape
                 shape.paint(p)
         if self.current:
             self.current.paint(p)
@@ -754,8 +765,12 @@ class Canvas(QtWidgets.QWidget):
                 self.zoomRequest.emit(delta.y(), ev.pos())
             else:
                 # scroll
-                self.scrollRequest.emit(delta.x(), QtCore.Qt.Horizontal)
-                self.scrollRequest.emit(delta.y(), QtCore.Qt.Vertical)
+                if QtCore.Qt.ShiftModifier == int(mods):
+                    self.scrollRequest.emit(delta.x(), QtCore.Qt.Vertical)
+                    self.scrollRequest.emit(delta.y(), QtCore.Qt.Horizontal)
+                else:
+                    self.scrollRequest.emit(delta.x(), QtCore.Qt.Horizontal)
+                    self.scrollRequest.emit(delta.y(), QtCore.Qt.Vertical)
         else:
             if ev.orientation() == QtCore.Qt.Vertical:
                 mods = ev.modifiers()
