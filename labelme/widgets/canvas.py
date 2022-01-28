@@ -1,11 +1,7 @@
-from qtpy import QtCore
-from qtpy import QtGui
-from qtpy import QtWidgets
-
+import labelme.utils
 from labelme import QT5
 from labelme.shape import Shape
-import labelme.utils
-
+from qtpy import QtCore, QtGui, QtWidgets
 
 # TODO(unknown):
 # - [maybe] Find optimal epsilon value.
@@ -44,9 +40,7 @@ class Canvas(QtWidgets.QWidget):
         self.double_click = kwargs.pop("double_click", "close")
         if self.double_click not in [None, "close"]:
             raise ValueError(
-                "Unexpected value for double_click event: {}".format(
-                    self.double_click
-                )
+                "Unexpected value for double_click event: {}".format(self.double_click)
             )
         self.num_backups = kwargs.pop("num_backups", 10)
         super(Canvas, self).__init__(*args, **kwargs)
@@ -291,7 +285,7 @@ class Canvas(QtWidgets.QWidget):
                 self.setStatusTip(self.toolTip())
                 self.update()
                 break
-            elif index_edge is not None and shape.canAddPoint():
+            elif index_edge is not None:  #  and shape.canAddPoint():
                 if self.selectedVertex():
                     self.hShape.highlightClear()
                 self.prevhVertex = self.hVertex
@@ -351,7 +345,7 @@ class Canvas(QtWidgets.QWidget):
             pos = self.transformPos(ev.localPos())
         else:
             pos = self.transformPos(ev.posF())
-        
+
         if ev.button() == QtCore.Qt.MiddleButton:
             self.changeMode.emit()
         elif ev.button() == QtCore.Qt.LeftButton:
@@ -389,7 +383,7 @@ class Canvas(QtWidgets.QWidget):
                 if self.hShape not in self.selectedShapes and self.selectedEdge():
                     self.selectionChanged.emit([self.hShape])
                 else:
-                    if self.selectedEdge():
+                    if self.selectedEdge() and self.prevhShape.canAddPoint():
                         if not self.hShape.selected:
                             self.hShapeIsSelected
                         self.addPointToEdge()
@@ -407,8 +401,7 @@ class Canvas(QtWidgets.QWidget):
         elif ev.button() == QtCore.Qt.RightButton and self.editing():
             group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
             if not self.selectedShapes or (
-                self.hShape is not None
-                and self.hShape not in self.selectedShapes
+                self.hShape is not None and self.hShape not in self.selectedShapes
             ):
                 self.selectShapePoint(pos, multiple_selection_mode=group_mode)
                 self.repaint()
@@ -418,10 +411,7 @@ class Canvas(QtWidgets.QWidget):
         if ev.button() == QtCore.Qt.RightButton:
             menu = self.menus[len(self.selectedShapesCopy) > 0]
             self.restoreCursor()
-            if (
-                not menu.exec_(self.mapToGlobal(ev.pos()))
-                and self.selectedShapesCopy
-            ):
+            if not menu.exec_(self.mapToGlobal(ev.pos())) and self.selectedShapesCopy:
                 # Cancel the move by deleting the shadow copy.
                 self.selectedShapesCopy = []
                 self.repaint()
@@ -438,10 +428,7 @@ class Canvas(QtWidgets.QWidget):
 
         if self.movingShape and self.hShape:
             index = self.shapes.index(self.hShape)
-            if (
-                self.shapesBackups[-1][index].points
-                != self.shapes[index].points
-            ):
+            if self.shapesBackups[-1][index].points != self.shapes[index].points:
                 self.storeShapes()
                 self.shapeMoved.emit()
 
@@ -628,11 +615,9 @@ class Canvas(QtWidgets.QWidget):
 
         p.drawPixmap(0, 0, self.pixmap)
         Shape.scale = self.scale
-        
+
         for shape in self.shapes:
-            if (shape.selected or not self._hideBackround) and self.isVisible(
-                shape
-            ):
+            if (shape.selected or not self._hideBackround) and self.isVisible(shape):
                 # print("shape fill", shape)
                 # shape.fill = shape.selected or shape == self.hShape
                 shape.paint(p)
@@ -790,9 +775,7 @@ class Canvas(QtWidgets.QWidget):
 
     def moveByKeyboard(self, offset):
         if self.selectedShapes:
-            self.boundedMoveShapes(
-                self.selectedShapes, self.prevPoint + offset
-            )
+            self.boundedMoveShapes(self.selectedShapes, self.prevPoint + offset)
             self.repaint()
             self.movingShape = True
 
@@ -826,10 +809,7 @@ class Canvas(QtWidgets.QWidget):
         elif self.editing():
             if self.movingShape and self.selectedShapes:
                 index = self.shapes.index(self.selectedShapes[0])
-                if (
-                    self.shapesBackups[-1][index].points
-                    != self.shapes[index].points
-                ):
+                if self.shapesBackups[-1][index].points != self.shapes[index].points:
                     self.storeShapes()
                     self.shapeMoved.emit()
 
@@ -882,6 +862,11 @@ class Canvas(QtWidgets.QWidget):
         self.hShape = None
         self.hVertex = None
         self.hEdge = None
+        self.update()
+
+    def setMultipleShapesVisible(self, shapes, value):
+        for shape in shapes:
+            self.visible[shape] = value
         self.update()
 
     def setShapeVisible(self, shape, value):

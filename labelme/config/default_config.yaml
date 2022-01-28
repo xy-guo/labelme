@@ -15,9 +15,16 @@ sort_labels: true
 validate_label: null
 
 default_shape_color: [0, 255, 0]
-shape_color: auto  # null, 'auto', 'manual'
+shape_color: manual  # null, 'auto', 'manual'
 shift_auto_shape_color: 0
-label_colors: null
+label_colors: 
+  valid: [255, 150, 50]
+  invalid: [0, 0, 255]
+  old_gt: [0, 255, 0]
+label_scale:
+  valid: 1.0
+  invalid: 0.25
+  old_gt: 0.5
 
 shape:
   # drawing
@@ -28,7 +35,7 @@ shape:
   select_line_color: [255, 255, 255, 255]
   select_fill_color: [0, 255, 0, 155]
   hvertex_fill_color: [255, 255, 255, 255]
-  point_size: 8
+  point_size: 4
 
 # main
 flag_dock:
@@ -60,7 +67,7 @@ fit_to_content:
   row: false
 
 # canvas
-epsilon: 10.0
+epsilon: 5.0
 canvas:
   # None: do nothing
   # close: close polygon

@@ -1,11 +1,9 @@
 import copy
 import math
 
-from qtpy import QtCore
-from qtpy import QtGui
+from qtpy import QtCore, QtGui
 
 import labelme.utils
-
 
 # TODO(unknown):
 # - [opt] Store paths instead of creating new ones at each paint.
@@ -45,12 +43,7 @@ class Shape(object):
     scale = 1.0
 
     def __init__(
-        self,
-        label=None,
-        line_color=None,
-        shape_type=None,
-        flags=None,
-        group_id=None,
+        self, label=None, line_color=None, shape_type=None, flags=None, group_id=None,
     ):
         self.label = label
         self.group_id = group_id
@@ -67,6 +60,7 @@ class Shape(object):
             self.NEAR_VERTEX: (4, self.P_ROUND),
             self.MOVE_VERTEX: (1.5, self.P_SQUARE),
         }
+        self.label_scale = 1.0
 
         self._closed = False
 
@@ -107,7 +101,8 @@ class Shape(object):
             self.points.append(point)
 
     def canAddPoint(self):
-        return self.shape_type in ["polygon", "linestrip"]
+        if self.label and self.label == "valid":
+            return self.shape_type in ["polygon", "linestrip"]
 
     def popPoint(self):
         if self.points:
@@ -133,12 +128,10 @@ class Shape(object):
 
     def paint(self, painter):
         if self.points:
-            color = (
-                self.select_line_color if self.selected else self.line_color
-            )
+            color = self.select_line_color if self.selected else self.line_color
             pen = QtGui.QPen(color)
             # Try using integer sizes for smoother drawing(?)
-            pen.setWidth(max(1, int(round(2.0 / self.scale))))
+            pen.setWidth(max(1, int(round(2.0 / self.scale / self.label_scale))))
             painter.setPen(pen)
 
             line_path = QtGui.QPainterPath()
@@ -180,21 +173,17 @@ class Shape(object):
             painter.drawPath(vrtx_path)
             painter.fillPath(vrtx_path, self._vertex_fill_color)
             if self.fill:
-                color = (
-                    self.select_fill_color
-                    if self.selected
-                    else self.fill_color
-                )
+                color = self.select_fill_color if self.selected else self.fill_color
                 painter.fillPath(line_path, color)
 
     def drawVertex(self, path, i):
-        d = self.point_size / self.scale
+        d = self.point_size / self.scale / max(self.label_scale, 1.0)
         shape = self.point_type
         point = self.points[i]
         if i == self._highlightIndex:
             size, shape = self._highlightSettings[self._highlightMode]
             d *= size
-        if self._highlightIndex is not None: #  or self.selected:
+        if self._highlightIndex is not None:  #  or self.selected:
             self._vertex_fill_color = self.hvertex_fill_color
         else:
             self._vertex_fill_color = self.vertex_fill_color
